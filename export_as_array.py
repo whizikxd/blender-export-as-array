@@ -41,8 +41,9 @@ def get_array_string_for(mesh):
     object_begin = bpy.context.scene.option_object_begin
     object_delim = bpy.context.scene.option_object_delim
     object_end = bpy.context.scene.option_object_end
+    include_faces = bpy.context.scene.option_include_faces
 
-    result = ""
+    result = "verts = "
     result += array_begin
     result += "\n"
 
@@ -71,6 +72,27 @@ def get_array_string_for(mesh):
         result += "\n"
 
     result += array_end
+
+    if include_faces:
+        result += "\n\n"
+        result += "faces = "
+        result += array_begin
+        result += "\n"
+        for f in bm.faces:
+            result += "\t"
+            result += object_begin
+            for v in f.verts:
+                result += " "
+                result += str(v.index)
+                result += index_suffix
+                result += object_delim
+                result += " "
+
+            result += object_end
+            result += array_delim
+            result += "\n"
+
+        result += array_end
 
     bm.free()
     return result
@@ -146,6 +168,10 @@ class OBJECT_OT_export_as_array(bpy.types.Operator):
 
         left_col.label(text="Object end")
         right_col.prop(bpy.context.scene, "option_object_end", text="")
+
+        left_col.label(text="Include faces")
+        right_col.prop(bpy.context.scene, "option_include_faces", text="")
+
         layout.operator(OBJECT_OT_export_as_array_clipboard.bl_idname)
         layout.operator(OBJECT_OT_export_as_array_disk.bl_idname)
 
@@ -158,16 +184,18 @@ def menu_func(self, context):
     layout.operator(OBJECT_OT_export_as_array.bl_idname)
 
 def register():
-    bpy.types.Scene.option_vert_suffix = StringProperty(default=".f")
+    bpy.types.Scene.option_vert_suffix = StringProperty(default="f")
     bpy.types.Scene.option_index_suffix = StringProperty(default="")
 
-    bpy.types.Scene.option_array_begin = StringProperty(default="float vert[][3] = {")
+    bpy.types.Scene.option_array_begin = StringProperty(default="{")
     bpy.types.Scene.option_array_delim = StringProperty(default=",")
     bpy.types.Scene.option_array_end = StringProperty(default="};")
 
     bpy.types.Scene.option_object_begin = StringProperty(default="{")
     bpy.types.Scene.option_object_delim = StringProperty(default=",")
     bpy.types.Scene.option_object_end = StringProperty(default="}")
+
+    bpy.types.Scene.option_include_faces = BoolProperty(default=True)
 
     bpy.utils.register_class(OBJECT_OT_export_as_array)
     bpy.utils.register_class(OBJECT_OT_export_as_array_clipboard)
@@ -183,6 +211,7 @@ def unregister():
     del bpy.types.Scene.option_object_begin
     del bpy.types.Scene.option_object_delim
     del bpy.types.Scene.option_object_end
+    del bpy.types.Scene.option_include_faces
 
     bpy.utils.unregister_class(OBJECT_OT_export_as_array)
     bpy.utils.unregister_class(OBJECT_OT_export_as_array_clipboard)
