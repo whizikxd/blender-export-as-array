@@ -81,12 +81,17 @@ def get_array_string_for(mesh):
         for f in bm.faces:
             result += "\t"
             result += object_begin
-            for v in f.verts:
+
+            v_last = len(f.verts) - 1
+            for i, v in enumerate(f.verts):
                 result += " "
                 result += str(v.index)
                 result += index_suffix
-                result += object_delim
-                result += " "
+
+                if i != v_last:
+                    result += object_delim
+                else:
+                    result += " "
 
             result += object_end
             result += array_delim
