@@ -18,7 +18,6 @@ bl_info = {
     "name": "Export as array",
     "description": "Exports selected object as an array",
     "author": "Timotej Milcak",
-    "version": (0, 1),
     "blender": (2, 80, 0),
     "location": "Object > Export as array",
     "warning": "WIP",
@@ -49,7 +48,7 @@ class Profile():
         self.object_end = object_end
 
 profiles = {
-    "profile_empty":Profile("Empty", "", "", "", "", "", "", "", ""),
+    "profile_empty": Profile("Empty", "", "", "", "", "", "", "", ""),
     "profile_c": Profile("C", "f", "", "{", ",", "};", "{", ",", "}"),
     "profile_py": Profile("Python", "", "", "[", ",", "]", "[", ",", "]")
 }
@@ -60,9 +59,26 @@ def generate_profile_items(self, context):
         result.append((key, value.name, ""))
     return result
 
+
+last_profile = "profile_empty"
 def change_profile(self, context):
+    global last_profile
     changed_to = self.profiles_enum
+
+    if last_profile == changed_to:
+        return
+
     storage = bpy.context.scene.export_as_array_properties
+
+    profiles[last_profile].vert_suffix = storage.vert_suffix
+    profiles[last_profile].index_suffix = storage.index_suffix
+    profiles[last_profile].array_begin = storage.array_begin
+    profiles[last_profile].array_delim = storage.array_delim
+    profiles[last_profile].array_end = storage.array_end
+    profiles[last_profile].object_begin = storage.object_begin
+    profiles[last_profile].object_delim = storage.object_delim
+    profiles[last_profile].object_end = storage.object_end
+    last_profile = changed_to
 
     storage.vert_suffix = profiles[changed_to].vert_suffix
     storage.index_suffix = profiles[changed_to].index_suffix
