@@ -59,6 +59,19 @@ def generate_profile_items(self, context):
         result.append((key, value.name, ""))
     return result
 
+def get_selected_mesh(self, context):
+    selected_objects = bpy.context.selected_objects
+    selected_objects_count = len(selected_objects)
+    if selected_objects_count == 1:
+        active_object = selected_objects[0]
+        if active_object is not None and active_object.type == "MESH":
+            return active_object.to_mesh()
+        else:
+            self.report({"ERROR"}, "Invalid object selected!")
+            return None
+    else:
+        self.report({"ERROR"}, "Select precisely one object!")
+        return None
 
 last_profile = "profile_empty"
 def change_profile(self, context):
@@ -99,6 +112,12 @@ class ExportAsArrayProperties(bpy.types.PropertyGroup):
     object_delim: StringProperty()
     object_end: StringProperty()
     include_faces: BoolProperty(default=True)
+    profiles_enum: EnumProperty(
+        name="Profile",
+        update=change_profile,
+        items=generate_profile_items,
+    )
+
 
 def get_array_string_for(mesh):
     storage = bpy.context.scene.export_as_array_properties
@@ -183,7 +202,17 @@ class OBJECT_OT_export_as_array_disk(bpy.types.Operator):
         return {"RUNNING_MODAL"};
 
     def execute(self, context):
-        self.report({"ERROR"}, "UNIMPLEMENTED!")
+        selected_mesh = get_selected_mesh(self, context)
+
+        if selected_mesh != None:
+            string = get_array_string_for(selected_mesh)
+            try:
+                with open(self.filepath, "w") as f:
+                    f.write(string)
+                self.report({"INFO"}, "Successfuly saved!")
+            except Exception as e:
+                self.report({"ERROR"}, e)
+
         return {"FINISHED"}
 
 class OBJECT_OT_export_as_array_clipboard(bpy.types.Operator):
@@ -191,45 +220,34 @@ class OBJECT_OT_export_as_array_clipboard(bpy.types.Operator):
     bl_idname = "object.export_as_array_clipboard"
 
     def execute(self, context):
-        selected_objects = bpy.context.selected_objects
-        selected_objects_count = len(selected_objects)
-        if selected_objects_count == 1:
-            active_object = selected_objects[0]
-            if active_object is not None and active_object.type == "MESH":
-                string = get_array_string_for(active_object.to_mesh())
-                context.window_manager.clipboard = string
-                self.report({"INFO"}, "Successfuly copied")
-            else:
-                self.report({"ERROR"}, "Invalid object selected!")
-        else:
-            self.report({"ERROR"}, "Select precisely one object!")
+        selected_mesh = get_selected_mesh(self, context)
+
+        if selected_mesh != None:
+            string = get_array_string_for(selected_mesh)
+            context.window_manager.clipboard = string
+            self.report({"INFO"}, "Successfuly copied")
+
         return {"FINISHED"}
 
 class OBJECT_OT_export_as_array(bpy.types.Operator):
     bl_label = "Export as array"
     bl_idname = "object.export_as_array"
 
-    profiles_enum: EnumProperty(
-        name="Profile",
-        update=change_profile,
-        items=generate_profile_items,
-    )
-
     def invoke(self, context, event):
         return context.window_manager.invoke_popup(self, width=250)
 
     def draw(self, context):
         layout = self.layout
+        storage = bpy.context.scene.export_as_array_properties
+
         row = layout.row()
         row.label(text="Export settings")
-        row.prop(self, "profiles_enum")
+        row.prop(storage, "profiles_enum")
         layout.separator(type="LINE")
 
         split = layout.split(factor=0.5)
         left_col = split.column()
         right_col = split.column()
-
-        storage = bpy.context.scene.export_as_array_properties
 
         left_col.label(text="Vertex suffix")
         right_col.prop(storage, "vert_suffix", text="")
