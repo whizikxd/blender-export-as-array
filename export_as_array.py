@@ -196,7 +196,8 @@ class OBJECT_OT_export_as_array_disk(bpy.types.Operator):
     bl_label = "Export to disk"
     bl_idname = "object.export_as_array_disk"
 
-    filepath: StringProperty(subtype="FILE_PATH")
+    filepath: StringProperty(subtype="FILE_PATH", options={"HIDDEN"})
+    check_existing: BoolProperty(default=True, options={"HIDDEN"})
 
     def invoke(self, context, event):
         context.window_manager.fileselect_add(self)
@@ -212,7 +213,7 @@ class OBJECT_OT_export_as_array_disk(bpy.types.Operator):
                     f.write(string)
                 self.report({"INFO"}, "Successfuly saved!")
             except Exception as e:
-                self.report({"ERROR"}, e)
+                self.report({"ERROR"}, str(e))
 
         return {"FINISHED"}
 
