@@ -111,11 +111,18 @@ class ExportAsArrayProperties(bpy.types.PropertyGroup):
     object_begin: StringProperty()
     object_delim: StringProperty()
     object_end: StringProperty()
-    include_faces: BoolProperty(default=True)
     profiles_enum: EnumProperty(
         name="Profile",
         update=change_profile,
         items=generate_profile_items,
+    )
+    export_mode_enum: EnumProperty(
+        name="Export mode",
+        items=[
+            ("export_mode_verts_plus_faces", "Vertices + faces", ""),
+            ("export_mode_verts_only", "Vertices only", ""),
+            ("export_mode_faces_only", "Faces only", ""),
+        ]
     )
 
 
@@ -130,62 +137,56 @@ def get_array_string_for(mesh):
     object_begin = storage.object_begin
     object_delim = storage.object_delim
     object_end = storage.object_end
-    include_faces = storage.include_faces
+    export_mode = storage.export_mode_enum
 
-    result = "verts = "
-    result += array_begin
-    result += "\n"
+    export_vertices = False
+    export_faces = False
+    if export_mode == "export_mode_verts_plus_faces":
+        export_vertices = True
+        export_faces = True
+    elif export_mode == "export_mode_verts_only":
+        export_vertices = True
+    elif export_mode == "export_mode_faces_only":
+        export_faces = True
+
+    result = ""
 
     bm = bmesh.new()
     bm.from_mesh(mesh)
-    for v in bm.verts:
-        result += "\t"
-        result += object_begin
-        result += " "
-        result += str(v.co.x)
-        result += vert_suffix
-        result += object_delim
-        result += " "
 
-        result += str(v.co.y)
-        result += vert_suffix
-        result += object_delim
-        result += " "
+    if export_vertices:
+        result += f"verts = {array_begin}\n"
+        v_last = len(bm.verts) - 1
+        for i, v in enumerate(bm.verts):
+            result += f"\t{object_begin} {str(v.co.x)}{vert_suffix}{object_delim} "
+            result += f"{str(v.co.y)}{vert_suffix}{object_delim} "
+            result += f"{str(v.co.z)}{vert_suffix} "
+            result += f"{object_end}"
+            if i != v_last:
+                result += f"{array_delim}\n"
+            else:
+                result += "\n"
+        result += array_end
 
-        result += str(v.co.z)
-        result += vert_suffix
-        result += " "
-
-        result += object_end
-        result += array_delim
-        result += "\n"
-
-    result += array_end
-
-    if include_faces:
-        result += "\n\n"
-        result += "faces = "
-        result += array_begin
-        result += "\n"
-        for f in bm.faces:
-            result += "\t"
-            result += object_begin
-
+    if export_faces:
+        if export_vertices:
+            result += "\n\n"
+        result += f"faces = {array_begin}\n"
+        f_last = len(bm.faces) - 1
+        for i, f in enumerate(bm.faces):
+            result += f"\t{object_begin}"
             v_last = len(f.verts) - 1
-            for i, v in enumerate(f.verts):
-                result += " "
-                result += str(v.index)
-                result += index_suffix
-
-                if i != v_last:
+            for j, v in enumerate(f.verts):
+                result += f" {str(v.index)}{index_suffix}"
+                if j != v_last:
                     result += object_delim
                 else:
                     result += " "
-
-            result += object_end
-            result += array_delim
-            result += "\n"
-
+            result += f"{object_end}"
+            if i != f_last:
+                result += f"{array_delim}\n"
+            else:
+                result += "\n"
         result += array_end
 
     bm.free()
@@ -273,8 +274,7 @@ class OBJECT_OT_export_as_array(bpy.types.Operator):
         left_col.label(text="Object end")
         right_col.prop(storage, "object_end", text="")
 
-        left_col.label(text="Include faces")
-        right_col.prop(storage, "include_faces", text="")
+        layout.prop(storage, "export_mode_enum", text="")
 
         layout.operator(OBJECT_OT_export_as_array_clipboard.bl_idname)
         layout.operator(OBJECT_OT_export_as_array_disk.bl_idname)
