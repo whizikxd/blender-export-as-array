@@ -125,18 +125,58 @@ class ExportAsArrayProperties(bpy.types.PropertyGroup):
         ]
     )
 
-
-def get_array_string_for(mesh):
+def format_vertices(vertices):
     storage = bpy.context.scene.export_as_array_properties
-
     vert_suffix = storage.vert_suffix
-    index_suffix = storage.index_suffix
-    array_begin = storage.array_begin
-    array_delim = storage.array_delim
-    array_end = storage.array_end
     object_begin = storage.object_begin
     object_delim = storage.object_delim
     object_end = storage.object_end
+    array_begin = storage.array_begin
+    array_delim = storage.array_delim
+    array_end = storage.array_end
+
+    vertex_lines = [
+        (
+            f"\t{object_begin} {v.co.x}{vert_suffix}{object_delim} "
+            f"{v.co.y}{vert_suffix}{object_delim} "
+            f"{v.co.z}{vert_suffix} "
+            f"{object_end}"
+        )
+        for v in vertices
+    ]
+    return (
+        f"verts = {array_begin}\n" +
+        f"{array_delim}\n".join(vertex_lines) +
+        f"\n{array_end}"
+    )
+
+def format_faces(faces):
+    storage = bpy.context.scene.export_as_array_properties
+    index_suffix = storage.index_suffix
+    object_begin = storage.object_begin
+    object_delim = storage.object_delim
+    object_end = storage.object_end
+    array_begin = storage.array_begin
+    array_delim = storage.array_delim
+    array_end = storage.array_end
+
+    face_lines = [
+        (
+            f"\t{object_begin} " +
+            f"{object_delim} ".join([f"{v.index}{index_suffix}" for v in f.verts]) +
+            f" {object_end}"
+        )
+        for f in faces
+    ]
+
+    return (
+        f"faces = {array_begin}\n" +
+        f"{array_delim}\n".join(face_lines) +
+        f"\n{array_end}"
+    )
+
+def get_array_string_for(mesh):
+    storage = bpy.context.scene.export_as_array_properties
     export_mode = storage.export_mode_enum
 
     export_vertices = False
@@ -149,46 +189,13 @@ def get_array_string_for(mesh):
     elif export_mode == "export_mode_faces_only":
         export_faces = True
 
-    result = ""
-
     bm = bmesh.new()
     bm.from_mesh(mesh)
-
-    if export_vertices:
-        result += f"verts = {array_begin}\n"
-        v_last = len(bm.verts) - 1
-        for i, v in enumerate(bm.verts):
-            result += f"\t{object_begin} {str(v.co.x)}{vert_suffix}{object_delim} "
-            result += f"{str(v.co.y)}{vert_suffix}{object_delim} "
-            result += f"{str(v.co.z)}{vert_suffix} "
-            result += f"{object_end}"
-            if i != v_last:
-                result += f"{array_delim}\n"
-            else:
-                result += "\n"
-        result += array_end
-
-    if export_faces:
-        if export_vertices:
-            result += "\n\n"
-        result += f"faces = {array_begin}\n"
-        f_last = len(bm.faces) - 1
-        for i, f in enumerate(bm.faces):
-            result += f"\t{object_begin}"
-            v_last = len(f.verts) - 1
-            for j, v in enumerate(f.verts):
-                result += f" {str(v.index)}{index_suffix}"
-                if j != v_last:
-                    result += object_delim
-                else:
-                    result += " "
-            result += f"{object_end}"
-            if i != f_last:
-                result += f"{array_delim}\n"
-            else:
-                result += "\n"
-        result += array_end
-
+    sep = "\n\n"
+    result = (
+        f"{format_vertices(bm.verts) if export_vertices else ''}"
+        f"{sep if export_vertices else ''}{format_faces(bm.faces) if export_faces else ''}"
+    )
     bm.free()
     return result
 
@@ -288,20 +295,23 @@ def menu_func(self, context):
     layout.separator(type="LINE")
     layout.operator(OBJECT_OT_export_as_array.bl_idname)
 
+classes = [
+    ExportAsArrayProperties,
+    OBJECT_OT_export_as_array,
+    OBJECT_OT_export_as_array_clipboard,
+    OBJECT_OT_export_as_array_disk
+]
+
 def register():
-    bpy.utils.register_class(ExportAsArrayProperties)
+    for c in classes:
+        bpy.utils.register_class(c)
     bpy.types.Scene.export_as_array_properties = PointerProperty(type=ExportAsArrayProperties)
-    bpy.utils.register_class(OBJECT_OT_export_as_array)
-    bpy.utils.register_class(OBJECT_OT_export_as_array_clipboard)
-    bpy.utils.register_class(OBJECT_OT_export_as_array_disk)
     bpy.types.VIEW3D_MT_object.append(menu_func)
 
 def unregister():
     del bpy.types.Scene.export_as_array_properties
-    bpy.utils.unregister_class(ExportAsArrayProperties)
-    bpy.utils.unregister_class(OBJECT_OT_export_as_array)
-    bpy.utils.unregister_class(OBJECT_OT_export_as_array_clipboard)
-    bpy.utils.unregister_class(OBJECT_OT_export_as_array_disk)
+    for c in classes:
+        bpy.utils.unregister_class(c)
     bpy.types.VIEW3D_MT_object.remove(menu_func)
 
 if __name__ == "__main__":
