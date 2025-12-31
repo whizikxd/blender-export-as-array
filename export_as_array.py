@@ -122,6 +122,7 @@ class ExportAsArrayProperties(bpy.types.PropertyGroup):
             ("export_mode_verts_plus_faces", "Vertices + faces", ""),
             ("export_mode_verts_only", "Vertices only", ""),
             ("export_mode_faces_only", "Faces only", ""),
+            ("export_mode_verts_per_face", "Vertices (per face)", ""),
         ]
     )
 
@@ -175,12 +176,40 @@ def format_faces(faces):
         f"\n{array_end}"
     )
 
+def format_vertices_per_face(faces):
+    storage = bpy.context.scene.export_as_array_properties
+    vert_suffix = storage.vert_suffix
+    object_begin = storage.object_begin
+    object_delim = storage.object_delim
+    object_end = storage.object_end
+    array_begin = storage.array_begin
+    array_delim = storage.array_delim
+    array_end = storage.array_end
+
+    face_lines = [
+        (
+            f"\t{object_begin} {v.co.x}{vert_suffix}{object_delim} "
+            f"{v.co.y}{vert_suffix}{object_delim} "
+            f"{v.co.z}{vert_suffix} "
+            f"{object_end}"
+        )
+        for f in faces
+        for v in f.verts
+    ]
+
+    return (
+        f"verts_per_face = {array_begin}\n" +
+        f"{array_delim}\n".join(face_lines) +
+        f"\n{array_end}"
+    )
+
 def get_array_string_for(mesh):
     storage = bpy.context.scene.export_as_array_properties
     export_mode = storage.export_mode_enum
 
     export_vertices = False
     export_faces = False
+    export_vertices_per_face = False
     if export_mode == "export_mode_verts_plus_faces":
         export_vertices = True
         export_faces = True
@@ -188,6 +217,8 @@ def get_array_string_for(mesh):
         export_vertices = True
     elif export_mode == "export_mode_faces_only":
         export_faces = True
+    elif export_mode == "export_mode_verts_per_face":
+        export_vertices_per_face = True
 
     bm = bmesh.new()
     bm.from_mesh(mesh)
@@ -195,6 +226,7 @@ def get_array_string_for(mesh):
     result = (
         f"{format_vertices(bm.verts) if export_vertices else ''}"
         f"{sep if export_vertices else ''}{format_faces(bm.faces) if export_faces else ''}"
+        f"{format_vertices_per_face(bm.faces) if export_vertices_per_face else ''}"
     )
     bm.free()
     return result
@@ -258,29 +290,19 @@ class OBJECT_OT_export_as_array(bpy.types.Operator):
         left_col = split.column()
         right_col = split.column()
 
-        left_col.label(text="Vertex suffix")
-        right_col.prop(storage, "vert_suffix", text="")
-
-        left_col.label(text="Index suffix")
-        right_col.prop(storage, "index_suffix", text="")
-
-        left_col.label(text="Array begin")
-        right_col.prop(storage, "array_begin", text="")
-
-        left_col.label(text="Array delimiter")
-        right_col.prop(storage, "array_delim", text="")
-
-        left_col.label(text="Array end")
-        right_col.prop(storage, "array_end", text="")
-
-        left_col.label(text="Object begin")
-        right_col.prop(storage, "object_begin", text="")
-
-        left_col.label(text="Object delimiter")
-        right_col.prop(storage, "object_delim", text="")
-
-        left_col.label(text="Object end")
-        right_col.prop(storage, "object_end", text="")
+        props = [
+            ("Vertex suffix", "vert_suffix"),
+            ("Index suffix", "index_suffix"),
+            ("Array begin", "array_begin"),
+            ("Array delimiter", "array_delim"),
+            ("Array end", "array_end"),
+            ("Object begin", "object_begin"),
+            ("Object delimiter", "object_delim"),
+            ("Object end", "object_end")
+        ]
+        for prop in props:
+            left_col.label(text=prop[0])
+            right_col.prop(storage, prop[1], text="")
 
         layout.prop(storage, "export_mode_enum", text="")
 
